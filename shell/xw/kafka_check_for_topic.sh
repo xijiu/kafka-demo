@@ -133,20 +133,27 @@ if [ $num -gt 0 ]; then
 
         topicResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s  http://${agentIp}:8081/agent/v1.0/kafka/topic/list?pageIndex=1\&pageSize=30000")
 
-        topicCount=$(echo $topicResponse | jq '.data.totalCount')
+        topicCount=$(echo "$topicResponse" | grep -o '"totalCount": *[0-9]*' | sed 's/"totalCount": *//')
 
         Info "Topic总数：$topicCount"
 
-        mapfile -t topicInfos < <(echo "$topicResponse" | jq -c '.data.item[]')
+        topicInfos=()
+        while IFS= read -r line; do
+            topicInfos+=("$line")
+        done < <(echo "$topicResponse" | grep -o '{[^}]*"name":[^}]*"partitionNum":[^}]*"replicasNum":[^}]*}')
+
         # 初始化 partitionNum 总和
         totalPartitions=0
         # 初始化一个数组用于存储很久没有消息写入的 topic
         declare -a topic_info_array
         # 遍历 topics 并检查 replicasNum 是否为 1，同时计算 partitionNum 总和
         for topic in "${topicInfos[@]}"; do
-            name=$(echo "$topic" | jq -r '.name')
-            partitionNum=$(echo "$topic" | jq -r '.partitionNum')
-            replicasNum=$(echo "$topic" | jq -r '.replicasNum')
+            # 提取 name 字段的值
+            name=$(echo "$topic" | grep -o '"name": *"[^"]*"' | sed 's/"name": *"//;s/"//')
+            # 提取 partitionNum 字段的值
+            partitionNum=$(echo "$topic" | grep -o '"partitionNum": *[0-9]*' | sed 's/"partitionNum": *//')
+            # 提取 replicasNum 字段的值
+            replicasNum=$(echo "$topic" | grep -o '"replicasNum": *[0-9]*' | sed 's/"replicasNum": *//')
 
             # 累加 partitionNum
             totalPartitions=$((totalPartitions + partitionNum))
@@ -195,55 +202,6 @@ if [ $num -gt 0 ]; then
             podOk=4
             Warn "Kafainstance:${ns}  $kafkaInstanceName topicCount:$topicCount totalPartitions:$totalPartitions，分区过多会降低Kafka性能，若实例总流量较低，请忽略"
         fi
-
-#        # 输出未使用的topic，包括近期没使用的和一直没用到的僵尸topic
-#        Info "未使用的Topic数量：${#topic_info_array[@]}"
-#        if [ ${#topic_info_array[@]} -gt 0 ]; then
-#            Warn "未使用的Topic: "
-#            for topic_info in "${topic_info_array[@]}"; do
-#                IFS=','
-#                read -r name totalLag accumulativeMessageNum retentionHours <<<"$topic_info"
-#                Warn "Topic名称: $name, 消息堆积数: $totalLag, 累计消息数: $accumulativeMessageNum, 消息保留时长: $retentionHours 小时"
-#            done
-#        fi
-
-        # 以下是Group查询
-        groupResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s  http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/list?pageIndex=1\&pageSize=30000")
-
-        echo "groupResponse content $groupResponse"
-
-        groupCount=$(echo $groupResponse | jq '.data.totalCount')
-        Info "Group总数：$groupCount"
-
-        mapfile -t groupInfos < <(echo "$groupResponse" | jq -c '.data.item[]')
-
-        totalGroupMember=0
-
-        for group in "${groupInfos[@]}"; do
-            # 提取 groupId
-            groupId=$(echo "$group" | grep -o '"groupId": *"[^"]*"' | sed 's/"groupId": *"//;s/"//')
-            # 提取 state
-            state=$(echo "$group" | grep -o '"state": *"[^"]*"' | sed 's/"state": *"//;s/"//')
-            # 提取 memberNum
-            memberNum=$(echo "$group" | grep -o '"memberNum": *[0-9]*' | sed 's/"memberNum": *//')
-            GROUP_IDS="[\"$groupId\"]"
-            lagResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -X POST -H \"Content-Type: application/json\" -d '$GROUP_IDS' http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/lags")
-            echo "lagResponse lagResponse $lagResponse"
-
-            # 提取 lag
-            lag=$(echo "$lagResponse" | grep -o '"lag": *[0-9]*' | sed 's/"lag": *//')
-
-            totalGroupMember=$((totalGroupMember + memberNum))
-
-            echo "group groupId $groupId, state $state, memberNum $memberNum, lag is $lag"
-            # 如果 lag 大于 100 且 state 为 Stable，输出警告信息
-            if [ "$state" == "Stable" ] && [ "$lag" -ge 100 ]; then
-                Warn "Kafainstance:${ns}  $kafkaInstanceName has group $groupId 消费堆积: $lag，请通知业务方查看消费是否异常"
-                podOk=5
-            fi
-        done
-
-        Info "全部consumer个数为 $totalGroupMember"
 
         if [ "$podOk" -eq 0 ]; then
             Info "巡检通过"

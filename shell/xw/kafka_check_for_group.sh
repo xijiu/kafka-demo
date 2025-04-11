@@ -131,91 +131,19 @@ if [ $num -gt 0 ]; then
 
         curlPodName=$(kubectl -n ${ns} get po | grep ${kafkaInstanceName} | grep Running | grep -v doko | awk '{print $1}' | head -n 1)
 
-        topicResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s  http://${agentIp}:8081/agent/v1.0/kafka/topic/list?pageIndex=1\&pageSize=30000")
-
-        topicCount=$(echo $topicResponse | jq '.data.totalCount')
-
-        Info "Topic总数：$topicCount"
-
-        mapfile -t topicInfos < <(echo "$topicResponse" | jq -c '.data.item[]')
-        # 初始化 partitionNum 总和
-        totalPartitions=0
-        # 初始化一个数组用于存储很久没有消息写入的 topic
-        declare -a topic_info_array
-        # 遍历 topics 并检查 replicasNum 是否为 1，同时计算 partitionNum 总和
-        for topic in "${topicInfos[@]}"; do
-            name=$(echo "$topic" | jq -r '.name')
-            partitionNum=$(echo "$topic" | jq -r '.partitionNum')
-            replicasNum=$(echo "$topic" | jq -r '.replicasNum')
-
-            # 累加 partitionNum
-            totalPartitions=$((totalPartitions + partitionNum))
-
-            # 如果 replicasNum 为 1，输出警告信息
-            if [ "$replicasNum" -eq 1 ]; then
-                podOk=3
-                Warn "Kafainstance:${ns}  $kafkaInstanceName has topic $name replicasNum = 1,请通知业务方，高可用会存在问题，需要将topic副本数至少调整到2"
-            fi
-
-            # 查询 Topic 的位点信息和消息保留时长
-            topicDetailResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s  http://${agentIp}:8081/agent/v1.0/kafka/topic/detail?topicName=$name")
-
-            totalLag=0
-            accumulativeMessageNum=0
-
-            # 提取每个 partition 的 JSON 块
-            while IFS= read -r partition; do
-                # 提取 offsetMax 的值
-                logEndOffset=$(echo "$partition" | grep -o '"offsetMax": *[0-9]*' | sed 's/"offsetMax": *//')
-                # 提取 offsetMin 的值
-                logStartOffset=$(echo "$partition" | grep -o '"offsetMin": *[0-9]*' | sed 's/"offsetMin": *//')
-
-                # 计算 lagSize
-                lagSize=$((logEndOffset - logStartOffset))
-                # 累加 totalLag
-                totalLag=$((totalLag + lagSize))
-                # 累加 accumulativeMessageNum
-                accumulativeMessageNum=$((accumulativeMessageNum + logEndOffset))
-            done < <(echo "$topicDetailResponse" | grep -o '{[^}]*"offsetMax":[^}]*"offsetMin":[^}]*}')
-
-            echo "Total Lag: $totalLag"
-            echo "Accumulative Message Num: $accumulativeMessageNum"
-
-            if [ "$totalLag" -eq 0 ]; then
-#                retentionMs=$(echo "$topicDetailResponse" | grep -o '"retention.ms": *[0-9]*' | sed 's/"retention.ms": *//')
-                retentionMs=$(echo "$topicDetailResponse" | grep -o '"retention.ms":"[^"]*' | sed 's/"retention.ms":"//')
-                retentionHours=$(echo "$retentionMs" | awk '{printf "%.2f", $1 / (1000 * 60 * 60)}')
-                topic_info_array+=("$name,$totalLag,$accumulativeMessageNum,$retentionHours")
-            fi
-        done
-
-        # 输出 partitionNum 的总和
-        Info "Partition总数：$totalPartitions"
-        if [ "$totalPartitions" -ge 2000 ]; then
-            podOk=4
-            Warn "Kafainstance:${ns}  $kafkaInstanceName topicCount:$topicCount totalPartitions:$totalPartitions，分区过多会降低Kafka性能，若实例总流量较低，请忽略"
-        fi
-
-#        # 输出未使用的topic，包括近期没使用的和一直没用到的僵尸topic
-#        Info "未使用的Topic数量：${#topic_info_array[@]}"
-#        if [ ${#topic_info_array[@]} -gt 0 ]; then
-#            Warn "未使用的Topic: "
-#            for topic_info in "${topic_info_array[@]}"; do
-#                IFS=','
-#                read -r name totalLag accumulativeMessageNum retentionHours <<<"$topic_info"
-#                Warn "Topic名称: $name, 消息堆积数: $totalLag, 累计消息数: $accumulativeMessageNum, 消息保留时长: $retentionHours 小时"
-#            done
-#        fi
-
         # 以下是Group查询
         groupResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s  http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/list?pageIndex=1\&pageSize=30000")
 
         echo "groupResponse content $groupResponse"
 
-        groupCount=$(echo $groupResponse | jq '.data.totalCount')
+        groupCount=$(echo "$groupResponse" | grep -o '"totalCount": *[0-9]*' | sed 's/"totalCount": *//')
+
         Info "Group总数：$groupCount"
 
-        mapfile -t groupInfos < <(echo "$groupResponse" | jq -c '.data.item[]')
+        groupInfos=()
+        while IFS= read -r line; do
+            groupInfos+=("$line")
+        done < <(echo "$groupResponse" | grep -o '{[^}]*"groupId":[^}]*"state":[^}]*"memberNum":[^}]*}')
 
         totalGroupMember=0
 

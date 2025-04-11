@@ -67,6 +67,23 @@ EOF"
 
 }
 
+function computeTopicDiskSize() {
+    ns=$1
+    kafkaInstanceName=$2
+    enableSASL=$3
+    topic=$4
+
+    allTopicSizeContent=""
+    if [ $enableSASL == "true" ]; then
+        allTopicSizeContent=$(kubectl -n ${ns} exec $kafkaInstanceName-0-0 -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-log-dirs.sh --bootstrap-server localhost:9093 --command-config $admin_config --describe --topic-list $topic")
+    else
+        allTopicSizeContent=$(kubectl -n ${ns} exec $kafkaInstanceName-0-0 -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-log-dirs.sh --bootstrap-server localhost:9093 --describe --topic-list $topic")
+    fi
+    third_line=$(echo "$allTopicSizeContent" | sed -n '3p')
+    totalSizeByte=$(echo $third_line | jq '[.brokers[].logDirs[].partitions[].size] | add')
+    topicSizeGB=$(echo $totalSizeByte | awk '{printf "%.2f\n", $1 / 1024 / 1024/ 1024}')
+}
+
 # 定义匹配的天数
 MATCH_DAY=1
 
@@ -102,14 +119,14 @@ if [ $num -gt 0 ]; then
         runningStatus=$(kubectl -n ${ns} get kafkainstance ${kafkaInstanceName} -o jsonpath='{.status.status.status}')
         if [ x"$runningStatus" != x"Running" ]; then
             Error "Kafka instance: ${ns} ${kafkaInstanceName} status:$runningStatus. 请检查该实例，若是创建中的实例请忽略"
-            Info "----------Kafka实例 ${kafkaInstanceName} 巡检结束----------"
             continue
+            Info "----------Kafka实例 ${kafkaInstanceName} 巡检结束----------"
         fi
         crDeleteTimestap=$(kubectl -n ${ns} get kafkainstance ${kafkaInstanceName} -o jsonpath='{.metadata.deletionTimestamp}')
         if [ x"$crDeleteTimestap" != x"" ]; then
             Warn "Kafka instance: ${ns} ${kafkaInstanceName} is deleting. "
-            Info "----------Kafka实例 ${kafkaInstanceName} 巡检结束----------"
             continue
+            Info "----------Kafka实例 ${kafkaInstanceName} 巡检结束----------"
         fi
 
         unHealthPodCount=$(sudo kubectl get po --no-headers -n ${ns} | grep ${kafkaInstanceName} | grep -Ev "(Running|Completed|Terminating|Evicted)" -c)
@@ -117,16 +134,16 @@ if [ $num -gt 0 ]; then
             podOk=1
             Error "Kafka instance: ${ns}  ${kafkaInstanceName} pod状态检测:异常，请检查pod情况"
             sudo kubectl get po --no-headers -n ${ns} | grep ${kafkaInstanceName} | grep -Ev "(Running|Completed|Terminating|Evicted)"
-            Info "----------Kafka实例 ${kafkaInstanceName} 巡检结束----------"
             continue
+            Info "----------Kafka实例 ${kafkaInstanceName} 巡检结束----------"
         fi
 
         agentIp=$(kubectl -n ${ns} get kafkainstance ${kafkaInstanceName} -o jsonpath='{.status.agentVPCStatus.portsInfo[0].ipv4Address}')
         if [ x"$agentIp" == x ]; then
             podOk=2
             Error "Kafka instance: ${ns} ${kafkaInstanceName} agentIp is null. 请检查实例状态"
-            Info "----------Kafka实例 ${kafkaInstanceName} 巡检结束----------"
             continue
+            Info "----------Kafka实例 ${kafkaInstanceName} 巡检结束----------"
         fi
 
         curlPodName=$(kubectl -n ${ns} get po | grep ${kafkaInstanceName} | grep Running | grep -v doko | awk '{print $1}' | head -n 1)
@@ -154,37 +171,26 @@ if [ $num -gt 0 ]; then
             # 如果 replicasNum 为 1，输出警告信息
             if [ "$replicasNum" -eq 1 ]; then
                 podOk=3
+                computeTopicDiskSize $ns $kafkaInstanceName $saslEnabled $name
                 Warn "Kafainstance:${ns}  $kafkaInstanceName has topic $name replicasNum = 1,请通知业务方，高可用会存在问题，需要将topic副本数至少调整到2"
+                Info "computeTopicDiskSize result is : $topicSizeGB GB"
             fi
 
             # 查询 Topic 的位点信息和消息保留时长
             topicDetailResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s  http://${agentIp}:8081/agent/v1.0/kafka/topic/detail?topicName=$name")
-
             totalLag=0
             accumulativeMessageNum=0
-
-            # 提取每个 partition 的 JSON 块
-            while IFS= read -r partition; do
-                # 提取 offsetMax 的值
-                logEndOffset=$(echo "$partition" | grep -o '"offsetMax": *[0-9]*' | sed 's/"offsetMax": *//')
-                # 提取 offsetMin 的值
-                logStartOffset=$(echo "$partition" | grep -o '"offsetMin": *[0-9]*' | sed 's/"offsetMin": *//')
-
-                # 计算 lagSize
+            echo "$topicDetailResponse" | jq -c '.data.partitions[]' | while read -r partition; do
+                logEndOffset=$(echo "$partition" | jq -r '.offsetMax')
+                logStartOffset=$(echo "$partition" | jq -r '.offsetMin')
                 lagSize=$((logEndOffset - logStartOffset))
-                # 累加 totalLag
-                totalLag=$((totalLag + lagSize))
-                # 累加 accumulativeMessageNum
-                accumulativeMessageNum=$((accumulativeMessageNum + logEndOffset))
-            done < <(echo "$topicDetailResponse" | grep -o '{[^}]*"offsetMax":[^}]*"offsetMin":[^}]*}')
-
-            echo "Total Lag: $totalLag"
-            echo "Accumulative Message Num: $accumulativeMessageNum"
+                totalLag=$((lagSize + totalLag))
+                accumulativeMessageNum=$((logEndOffset + accumulativeMessageNum))
+            done
 
             if [ "$totalLag" -eq 0 ]; then
-#                retentionMs=$(echo "$topicDetailResponse" | grep -o '"retention.ms": *[0-9]*' | sed 's/"retention.ms": *//')
-                retentionMs=$(echo "$topicDetailResponse" | grep -o '"retention.ms":"[^"]*' | sed 's/"retention.ms":"//')
-                retentionHours=$(echo "$retentionMs" | awk '{printf "%.2f", $1 / (1000 * 60 * 60)}')
+                retentionMs=$(echo "$topicDetailResponse" | jq -r '.data.topicProperties."retention.ms"')
+                retentionHours=$(printf "%.2f" "$(bc <<<"scale=2; $retentionMs / (1000 * 60 * 60)")")
                 topic_info_array+=("$name,$totalLag,$accumulativeMessageNum,$retentionHours")
             fi
         done
@@ -210,40 +216,25 @@ if [ $num -gt 0 ]; then
         # 以下是Group查询
         groupResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s  http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/list?pageIndex=1\&pageSize=30000")
 
-        echo "groupResponse content $groupResponse"
-
         groupCount=$(echo $groupResponse | jq '.data.totalCount')
         Info "Group总数：$groupCount"
 
         mapfile -t groupInfos < <(echo "$groupResponse" | jq -c '.data.item[]')
 
         totalGroupMember=0
-
+        # 遍历 group 并检查 group 消费者个数是否大于50，同时计算 Member 总和
         for group in "${groupInfos[@]}"; do
-            # 提取 groupId
-            groupId=$(echo "$group" | grep -o '"groupId": *"[^"]*"' | sed 's/"groupId": *"//;s/"//')
-            # 提取 state
-            state=$(echo "$group" | grep -o '"state": *"[^"]*"' | sed 's/"state": *"//;s/"//')
-            # 提取 memberNum
-            memberNum=$(echo "$group" | grep -o '"memberNum": *[0-9]*' | sed 's/"memberNum": *//')
-            GROUP_IDS="[\"$groupId\"]"
-            lagResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -X POST -H \"Content-Type: application/json\" -d '$GROUP_IDS' http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/lags")
-            echo "lagResponse lagResponse $lagResponse"
-
-            # 提取 lag
-            lag=$(echo "$lagResponse" | grep -o '"lag": *[0-9]*' | sed 's/"lag": *//')
-
+            groupId=$(echo "$group" | jq -r '.groupId')
+            state=$(echo "$group" | jq -r '.state')
+            memberNum=$(echo "$group" | jq -r '.memberNum')
+            lag=$(echo "$group" | jq -r '.lag')
             totalGroupMember=$((totalGroupMember + memberNum))
-
-            echo "group groupId $groupId, state $state, memberNum $memberNum, lag is $lag"
-            # 如果 lag 大于 100 且 state 为 Stable，输出警告信息
+            # 如果 lag 大于 500，输出警告信息
             if [ "$state" == "Stable" ] && [ "$lag" -ge 100 ]; then
                 Warn "Kafainstance:${ns}  $kafkaInstanceName has group $groupId 消费堆积: $lag，请通知业务方查看消费是否异常"
                 podOk=5
             fi
         done
-
-        Info "全部consumer个数为 $totalGroupMember"
 
         if [ "$podOk" -eq 0 ]; then
             Info "巡检通过"
