@@ -68,6 +68,8 @@ EOF"
 
 }
 
+groupLagNum=0
+
 function groupSubscribeTopicNum() {
     ns=$1
     kafkaInstanceName=$2
@@ -80,6 +82,15 @@ function groupSubscribeTopicNum() {
     else
         allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9093 --describe --group $groupName")
     fi
+
+    lag_sum=0
+    while IFS= read -r line; do
+        lag=$(echo "$line" | awk '{print $5}')
+        if [[ $lag =~ ^[0-9]+$ ]]; then
+            ((lag_sum += lag))
+        fi
+    done <<< "$(echo "$allTopicSizeContent" | grep -v '^GROUP')"
+    groupLagNum=$lag_sum
 
     topicCount=$(echo "$allTopicSizeContent" | grep -v '^GROUP' | awk '{print $2}' | grep -v '^$' | sort | uniq | wc -l)
     return "$topicCount"
@@ -168,20 +179,17 @@ if [ $num -gt 0 ]; then
             memberNum=$(echo "$group" | grep -o '"memberNum": *[0-9]*' | sed 's/"memberNum": *//')
 #            subscribingTopicNum=$(echo "$group" | grep -o '"subscribingTopicNum": *[0-9]*' | sed 's/"subscribingTopicNum": *//')
             GROUP_IDS="[\"$groupId\"]"
-            lagResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s -X POST -H \"Content-Type: application/json\" -d '$GROUP_IDS' http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/lags")
 
-            # 提取 lag
-            lag=$(echo "$lagResponse" | grep -o '"lag": *[0-9]*' | sed 's/"lag": *//')
             totalGroupMember=$((totalGroupMember + memberNum))
 
             groupSubscribeTopicNum $ns $kafkaInstanceName $saslEnabled $groupId
             subscribingTopicNum=$?
 
-            Info "groupId $groupId, 状态 $state, Consumer数量 $memberNum, 堆积量 $lag, 订阅topic数 $subscribingTopicNum"
+            Info "groupId $groupId, 状态 $state, Consumer数量 $memberNum, 堆积量 $groupLagNum, 订阅topic数 $subscribingTopicNum"
 
             # 如果 lag 大于 100 且 state 为 Stable，输出警告信息
-            if [ "$state" == "Stable" ] && [ "$lag" -ge 100 ]; then
-                Warn "Kafainstance:${ns}  $kafkaInstanceName has group $groupId 消费堆积: $lag，请通知业务方查看消费是否异常"
+            if [ "$state" == "Stable" ] && [ "$groupLagNum" -ge 100 ]; then
+                Warn "Kafainstance:${ns}  $kafkaInstanceName has group $groupId 消费堆积: $groupLagNum，请通知业务方查看消费是否异常"
                 podOk=5
             fi
             # 如果 lag 大于 100 且 state 为 Stable，输出警告信息
