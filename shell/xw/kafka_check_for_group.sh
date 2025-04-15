@@ -133,9 +133,6 @@ if [ $num -gt 0 ]; then
 
         # 以下是Group查询
         groupResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s  http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/list?pageIndex=1\&pageSize=30000")
-
-        echo "groupResponse content $groupResponse"
-
         groupCount=$(echo "$groupResponse" | grep -o '"totalCount": *[0-9]*' | sed 's/"totalCount": *//')
 
         Info "Group总数：$groupCount"
@@ -143,31 +140,33 @@ if [ $num -gt 0 ]; then
         groupInfos=()
         while IFS= read -r line; do
             groupInfos+=("$line")
-        done < <(echo "$groupResponse" | grep -o '{[^}]*"groupId":[^}]*"state":[^}]*"memberNum":[^}]*}')
+        done < <(echo "$groupResponse" | grep -o '{[^}]*"groupId":[^}]*"state":[^}]*"memberNum":[^}]*"subscribingTopicNum":[^}]*}')
 
         totalGroupMember=0
 
         for group in "${groupInfos[@]}"; do
-            # 提取 groupId
             groupId=$(echo "$group" | grep -o '"groupId": *"[^"]*"' | sed 's/"groupId": *"//;s/"//')
-            # 提取 state
             state=$(echo "$group" | grep -o '"state": *"[^"]*"' | sed 's/"state": *"//;s/"//')
-            # 提取 memberNum
             memberNum=$(echo "$group" | grep -o '"memberNum": *[0-9]*' | sed 's/"memberNum": *//')
+            subscribingTopicNum=$(echo "$group" | grep -o '"subscribingTopicNum": *[0-9]*' | sed 's/"subscribingTopicNum": *//')
             GROUP_IDS="[\"$groupId\"]"
-            lagResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -X POST -H \"Content-Type: application/json\" -d '$GROUP_IDS' http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/lags")
-            echo "lagResponse lagResponse $lagResponse"
+            lagResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s -X POST -H \"Content-Type: application/json\" -d '$GROUP_IDS' http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/lags")
 
             # 提取 lag
             lag=$(echo "$lagResponse" | grep -o '"lag": *[0-9]*' | sed 's/"lag": *//')
-
             totalGroupMember=$((totalGroupMember + memberNum))
 
-            echo "group groupId $groupId, state $state, memberNum $memberNum, lag is $lag"
+            Info "groupId $groupId, 状态 $state, Consumer数量 $memberNum, 堆积量 $lag, 订阅topic数 $subscribingTopicNum"
+
             # 如果 lag 大于 100 且 state 为 Stable，输出警告信息
             if [ "$state" == "Stable" ] && [ "$lag" -ge 100 ]; then
                 Warn "Kafainstance:${ns}  $kafkaInstanceName has group $groupId 消费堆积: $lag，请通知业务方查看消费是否异常"
                 podOk=5
+            fi
+            # 如果 lag 大于 100 且 state 为 Stable，输出警告信息
+            if [ "$state" == "Stable" ] && [ "$subscribingTopicNum" -ge 5 ]; then
+                Warn "group $groupId 订阅Topic数量: $subscribingTopicNum，请通知业务方减少订阅topic"
+                podOk=6
             fi
         done
 

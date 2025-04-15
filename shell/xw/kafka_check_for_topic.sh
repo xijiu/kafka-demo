@@ -63,8 +63,28 @@ function genericAdminConfigIfSASLEnable() {
 security.protocol=SASL_PLAINTEXT
 sasl.mechanism=SCRAM-SHA-512
 sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$usernameTmp\" password=\"$passwordTmp\";
+request.timeout.ms=120000
 EOF"
 
+}
+
+function computeTopicDiskSize() {
+    ns=$1
+    kafkaInstanceName=$2
+    enableSASL=$3
+    topic=$4
+
+    allTopicSizeContent=""
+    if [ "$enableSASL" = "true" ]; then
+        allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-log-dirs.sh --bootstrap-server localhost:9093 --command-config $admin_config --describe --topic-list $topic")
+    else
+        allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-log-dirs.sh --bootstrap-server localhost:9093 --describe --topic-list $topic")
+    fi
+    third_line=$(echo "$allTopicSizeContent" | sed -n '3p')
+
+    # 不使用 jq，使用 awk 来提取并求和分区大小
+    totalSizeByte=$(echo $third_line | grep -o '"size":[0-9]*'  | awk -F: '{sum += $2} END {print sum}')
+    topicSizeGB=$(echo "$totalSizeByte" | awk '{printf "%.2f\n", $1 / 1024 / 1024 / 1024}')
 }
 
 # 定义匹配的天数
@@ -185,16 +205,27 @@ if [ $num -gt 0 ]; then
                 accumulativeMessageNum=$((accumulativeMessageNum + logEndOffset))
             done < <(echo "$topicDetailResponse" | grep -o '{[^}]*"offsetMax":[^}]*"offsetMin":[^}]*}')
 
-            echo "Total Lag: $totalLag"
-            echo "Accumulative Message Num: $accumulativeMessageNum"
+            retentionMs=$(echo "$topicDetailResponse" | grep -o '"retention.ms":"[^"]*' | sed 's/"retention.ms":"//')
+            retentionHours=$(echo "$retentionMs" | awk '{printf "%.2f", $1 / (1000 * 60 * 60)}')
+
+            computeTopicDiskSize $ns $kafkaInstanceName $saslEnabled $name
+            Info "Topic名称: $name, 当前broker存储消息数: $totalLag, 历史累计消息数: $accumulativeMessageNum, 消息保留时长: $retentionHours 小时, 占用磁盘大小 $topicSizeGB GB"
 
             if [ "$totalLag" -eq 0 ]; then
-#                retentionMs=$(echo "$topicDetailResponse" | grep -o '"retention.ms": *[0-9]*' | sed 's/"retention.ms": *//')
-                retentionMs=$(echo "$topicDetailResponse" | grep -o '"retention.ms":"[^"]*' | sed 's/"retention.ms":"//')
-                retentionHours=$(echo "$retentionMs" | awk '{printf "%.2f", $1 / (1000 * 60 * 60)}')
                 topic_info_array+=("$name,$totalLag,$accumulativeMessageNum,$retentionHours")
             fi
         done
+
+        # 输出未使用的topic，包括近期没使用的和一直没用到的僵尸topic
+        Info "未使用的Topic数量：${#topic_info_array[@]}"
+        if [ ${#topic_info_array[@]} -gt 0 ]; then
+            Warn "未使用的Topic: "
+            for topic_info in "${topic_info_array[@]}"; do
+                IFS=','
+                read -r name totalLag accumulativeMessageNum retentionHours <<<"$topic_info"
+                Warn "Topic名称: $name, 当前broker存储消息数: $totalLag, 历史累计消息数: $accumulativeMessageNum, 消息保留时长: $retentionHours 小时"
+            done
+        fi
 
         # 输出 partitionNum 的总和
         Info "Partition总数：$totalPartitions"

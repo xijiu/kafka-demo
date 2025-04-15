@@ -102,6 +102,9 @@ if [ $num -gt 0 ]; then
             genericAdminConfigIfSASLEnable $ns $kafkaInstanceName
         fi
 
+        diskSizeStr=$(kubectl -n ${ns} get kafkainstance ${kafkaInstanceName} -o jsonpath='{.spec.persistency.cap}')
+        diskSizeGi=$(echo "$diskSizeStr" | grep -oE '[0-9]+')
+
         runningStatus=$(kubectl -n ${ns} get kafkainstance ${kafkaInstanceName} -o jsonpath='{.status.status.status}')
         if [ x"$runningStatus" != x"Running" ]; then
             Error "Kafka instance: ${ns} ${kafkaInstanceName} status:$runningStatus. 请检查该实例，若是创建中的实例请忽略"
@@ -148,9 +151,26 @@ if [ $num -gt 0 ]; then
         for ((i = 1000; i < 1000 + $replicaNum; i++)); do
             index=$(expr $i - 1000)
             diskResponse=$(kubectl -n ${ns} exec -q "$kafkaInstanceName-$index-0" -- /bin/bash -c "du -sh /bitnami/kafka/data")
-            Info "broker $i, 占用磁盘空间 ：$diskResponse"
-            cpu=$(kubectl -n ${ns} exec -q "$kafkaInstanceName-$index-0" -- /bin/bash -c "ps -p 1 -o %cpu,%mem --no-headers")
-            Info "broker $i, cpu使用率及内存占用 ：$cpu"
+            diskSizeMStr=$(kubectl -n ${ns} exec -q "$kafkaInstanceName-$index-0" -- /bin/bash -c "du -m /bitnami/kafka/data")
+            diskSizeM=$(echo "$diskSizeMStr" | grep "/bitnami/kafka/data$" | awk '{print $1}')
+            percentage=$(awk "BEGIN {printf \"%.2f\", ($diskSizeM * 100) / ($diskSizeGi * 1024)}")
+            Info "broker $i, 占用磁盘空间：$diskResponse, 总磁盘空间：$diskSizeStr, 磁盘使用率：$percentage%"
+
+            cpuLoadStr=$(kubectl -n ${ns} exec -q "$kafkaInstanceName-$index-0" -- /bin/bash -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; sh /opt/bitnami/kafka/bin/kafka-run-class.sh kafka.tools.JmxTool --object-name java.lang:type=OperatingSystem --jmx-url service:jmx:rmi:///jndi/rmi://localhost:5555/jmxrmi --attributes ProcessCpuLoad --one-time true")
+            cpuLoad=$(echo "$cpuLoadStr" | awk 'NR==2 {split($0, arr, ","); print arr[2]}')
+            totalLoadStr=$(kubectl -n ${ns} exec -q "$kafkaInstanceName-$index-0" -- /bin/bash -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; sh /opt/bitnami/kafka/bin/kafka-run-class.sh kafka.tools.JmxTool --object-name java.lang:type=OperatingSystem --jmx-url service:jmx:rmi:///jndi/rmi://localhost:5555/jmxrmi --attributes AvailableProcessors --one-time true")
+
+            totalLoad=$(echo "$totalLoadStr" | awk 'NR==2 {split($0, arr, ","); print arr[2]}')
+            cpuPercentage=$(awk "BEGIN {printf \"%.2f\", ($cpuLoad * 100) / ($totalLoad)}")
+
+            memoryLoadStr=$(kubectl -n ${ns} exec -q "$kafkaInstanceName-$index-0" -- /bin/bash -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; sh /opt/bitnami/kafka/bin/kafka-run-class.sh kafka.tools.JmxTool --object-name java.lang:type=Memory --jmx-url service:jmx:rmi:///jndi/rmi://localhost:5555/jmxrmi --attributes HeapMemoryUsage --one-time true")
+            memoryLoadStr=$(echo "$memoryLoadStr" | awk 'NR==2')
+            memoryUsed=$(echo "$memoryLoadStr" | awk -F 'used=' '{split($2, arr, /[},]/); print arr[1]}')
+            memoryCommitted=$(echo "$memoryLoadStr" | awk -F 'committed=' '{split($2, arr, /[},]/); print arr[1]}')
+            memoryPercentage=$(awk "BEGIN {printf \"%.2f\", ($memoryUsed * 100) / ($memoryCommitted)}")
+
+
+            Info "broker $i,  cpu使用 $cpuLoad, cpu总大小 $totalLoad, cpu使用率 $cpuPercentage%, 堆内存使用 $memoryUsed, 堆内存总大小 $memoryCommitted, 堆内存使用率 $memoryPercentage%"
         done
 
 
