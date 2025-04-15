@@ -63,26 +63,8 @@ function genericAdminConfigIfSASLEnable() {
 security.protocol=SASL_PLAINTEXT
 sasl.mechanism=SCRAM-SHA-512
 sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$usernameTmp\" password=\"$passwordTmp\";
-request.timeout.ms=180000
 EOF"
 
-}
-
-function groupSubscribeTopicNum() {
-    ns=$1
-    kafkaInstanceName=$2
-    enableSASL=$3
-    groupName=$4
-
-    allTopicSizeContent=""
-    if [ "$enableSASL" = "true" ]; then
-        allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9093 --command-config $admin_config --describe --group $groupName")
-    else
-        allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9093 --describe --group $groupName")
-    fi
-
-    topicCount=$(echo "$allTopicSizeContent" | grep -v '^GROUP' | awk '{print $2}' | grep -v '^$' | sort | uniq | wc -l)
-    return "$topicCount"
 }
 
 # 定义匹配的天数
@@ -158,7 +140,7 @@ if [ $num -gt 0 ]; then
         groupInfos=()
         while IFS= read -r line; do
             groupInfos+=("$line")
-        done < <(echo "$groupResponse" | grep -o '{[^}]*"groupId":[^}]*"state":[^}]*"memberNum":[^}]*}')
+        done < <(echo "$groupResponse" | grep -o '{[^}]*"groupId":[^}]*"state":[^}]*"memberNum":[^}]*"subscribingTopicNum":[^}]*}')
 
         totalGroupMember=0
 
@@ -166,16 +148,13 @@ if [ $num -gt 0 ]; then
             groupId=$(echo "$group" | grep -o '"groupId": *"[^"]*"' | sed 's/"groupId": *"//;s/"//')
             state=$(echo "$group" | grep -o '"state": *"[^"]*"' | sed 's/"state": *"//;s/"//')
             memberNum=$(echo "$group" | grep -o '"memberNum": *[0-9]*' | sed 's/"memberNum": *//')
-#            subscribingTopicNum=$(echo "$group" | grep -o '"subscribingTopicNum": *[0-9]*' | sed 's/"subscribingTopicNum": *//')
+            subscribingTopicNum=$(echo "$group" | grep -o '"subscribingTopicNum": *[0-9]*' | sed 's/"subscribingTopicNum": *//')
             GROUP_IDS="[\"$groupId\"]"
             lagResponse=$(kubectl -n ${ns} exec -q $curlPodName -- /bin/bash -c "curl -s -X POST -H \"Content-Type: application/json\" -d '$GROUP_IDS' http://${agentIp}:8081/agent/v1.0/kafka/consumergroup/lags")
 
             # 提取 lag
             lag=$(echo "$lagResponse" | grep -o '"lag": *[0-9]*' | sed 's/"lag": *//')
             totalGroupMember=$((totalGroupMember + memberNum))
-
-            groupSubscribeTopicNum $ns $kafkaInstanceName $saslEnabled $groupId
-            subscribingTopicNum=$?
 
             Info "groupId $groupId, 状态 $state, Consumer数量 $memberNum, 堆积量 $lag, 订阅topic数 $subscribingTopicNum"
 
