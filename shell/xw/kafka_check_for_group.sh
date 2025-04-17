@@ -44,8 +44,6 @@ Debug() {
     echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] \033[32mDEBUG $1\033[0m"
 }
 
-topicSizeGB=""
-
 function genericAdminConfigIfSASLEnable() {
     ns=$1
     kafkaInstanceName=$2
@@ -66,31 +64,75 @@ sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule require
 request.timeout.ms=180000
 EOF"
 
+    portsInfo=$(kubectl -n ${ns} get kafkainstance ${kafkaInstanceName} -o jsonpath='{.status.brokerVPCStatus.portsInfo}')
+    hostContent=$(echo $portsInfo | grep -o '"ipv4Address":"[^"]*"' | sed 's/"ipv4Address":"//;s/"//' | awk '{print $0" "$0}')
+
+    allHostContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "cat /etc/hosts")
+
+    if echo "$allHostContent" | grep -q "$hostContent"; then
+        echo "host内容已填充，不再需要额外添加"
+    else
+        echo "host内容缺失，将进行添加，要添加的内容为 $hostContent"
+        kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "echo '$hostContent' >> /etc/hosts "
+    fi
 }
 
-groupLagNum=0
-
+declare -A groupAndLagMap
+declare -A groupAndTopicMap
 function groupSubscribeTopicNum() {
     ns=$1
     kafkaInstanceName=$2
     enableSASL=$3
-    groupName=$4
 
     allTopicSizeContent=""
     if [ "$enableSASL" = "true" ]; then
-        allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9093 --command-config $admin_config --describe --group $groupName")
+        allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9093 --command-config $admin_config --describe --all-groups")
     else
-        allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9093 --describe --group $groupName")
+        allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9093 --describe --all-groups")
     fi
 
-    lag_sum=0
+    # 逐个删除键值对
+    for key in "${!groupAndLagMap[@]}"; do
+        unset groupAndLagMap[$key]
+    done
+    for key in "${!groupAndTopicMap[@]}"; do
+        unset groupAndTopicMap[$key]
+    done
+
+    declare -A groupAndLagMapTmp
+    declare -A groupAndTopicMapTmp
     while IFS= read -r line; do
-        lag=$(echo "$line" | awk '{print $5}')
+        groupId=$(echo "$line" | awk '{print $1}')
+        topicName=$(echo "$line" | awk '{print $2}')
+        lag=$(echo "$line" | awk '{print $6}')
         if [[ $lag =~ ^[0-9]+$ ]]; then
-            ((lag_sum += lag))
+            # 检查键是否存在
+            if [[ -v groupAndLagMapTmp[$groupId] ]]; then
+                # 如果键存在，对其值进行累加
+                ((groupAndLagMapTmp[$groupId]+=lag))
+            else
+                # 如果键不存在，初始化该键的值
+                groupAndLagMapTmp[$groupId]=$lag
+            fi
+
+            if [[ -v groupAndTopicMapTmp[$groupId] ]]; then
+                # 如果键存在，对其值进行累加
+                groupAndTopicMapTmp[$groupId]=${groupAndTopicMapTmp[$groupId]}",$topicName"
+            else
+                # 如果键不存在，初始化该键的值
+                groupAndTopicMapTmp[$groupId]=$topicName
+            fi
         fi
-    done <<< "$(echo "$allTopicSizeContent" | grep -v '^GROUP')"
-    groupLagNum=$lag_sum
+    done <<< "$(echo "$allTopicSizeContent")"
+
+    for key in "${!groupAndLagMapTmp[@]}"; do
+        # 将源关联数组的值赋给目标关联数组相同的键
+        groupAndLagMap[$key]=${groupAndLagMapTmp[$key]}
+    done
+    for key in "${!groupAndTopicMapTmp[@]}"; do
+        # 将源关联数组的值赋给目标关联数组相同的键
+        groupAndTopicMap[$key]=${groupAndTopicMapTmp[$key]}
+    done
 
     topicCount=$(echo "$allTopicSizeContent" | grep -v '^GROUP' | awk '{print $2}' | grep -v '^$' | sort | uniq | wc -l)
     return "$topicCount"
@@ -120,6 +162,10 @@ if [ $num -gt 0 ]; then
         podOk=0
         ns=$(echo ${res} | cut -d " " -f 1)
         kafkaInstanceName=$(echo ${res} | cut -d " " -f 2)
+
+        if [ $# -gt 0 -a "$1" != "$kafkaInstanceName" ]; then
+            continue
+        fi
 
         Info "----------Kafka实例 ${kafkaInstanceName} 巡检开始----------"
 
@@ -173,17 +219,27 @@ if [ $num -gt 0 ]; then
 
         totalGroupMember=0
 
+        groupSubscribeTopicNum $ns $kafkaInstanceName $saslEnabled
+
         for group in "${groupInfos[@]}"; do
             groupId=$(echo "$group" | grep -o '"groupId": *"[^"]*"' | sed 's/"groupId": *"//;s/"//')
             state=$(echo "$group" | grep -o '"state": *"[^"]*"' | sed 's/"state": *"//;s/"//')
             memberNum=$(echo "$group" | grep -o '"memberNum": *[0-9]*' | sed 's/"memberNum": *//')
-#            subscribingTopicNum=$(echo "$group" | grep -o '"subscribingTopicNum": *[0-9]*' | sed 's/"subscribingTopicNum": *//')
-            GROUP_IDS="[\"$groupId\"]"
 
             totalGroupMember=$((totalGroupMember + memberNum))
 
-            groupSubscribeTopicNum $ns $kafkaInstanceName $saslEnabled $groupId
-            subscribingTopicNum=$?
+            groupLagNum=0
+            if [[ -v groupAndLagMap[$groupId] ]]; then
+                groupLagNum="${groupAndLagMap[$groupId]}"
+            fi
+
+            subscribingTopicNum=0
+            if [[ -v groupAndTopicMap[$groupId] ]]; then
+                groupTopics="${groupAndTopicMap[$groupId]}"
+                split_string=$(echo "$groupTopics" | tr ',' '\n')
+                unique_string=$(echo "$split_string" | sort | uniq)
+                subscribingTopicNum=$(echo "$unique_string" | wc -l)
+            fi
 
             Info "groupId $groupId, 状态 $state, Consumer数量 $memberNum, 堆积量 $groupLagNum, 订阅topic数 $subscribingTopicNum"
 
