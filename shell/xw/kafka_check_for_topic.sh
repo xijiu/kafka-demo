@@ -63,9 +63,20 @@ function genericAdminConfigIfSASLEnable() {
 security.protocol=SASL_PLAINTEXT
 sasl.mechanism=SCRAM-SHA-512
 sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$usernameTmp\" password=\"$passwordTmp\";
-request.timeout.ms=120000
+request.timeout.ms=180000
 EOF"
 
+    portsInfo=$(kubectl -n ${ns} get kafkainstance ${kafkaInstanceName} -o jsonpath='{.status.brokerVPCStatus.portsInfo}')
+    hostContent=$(echo $portsInfo | grep -o '"ipv4Address":"[^"]*"' | sed 's/"ipv4Address":"//;s/"//' | awk '{print $0" "$0}')
+
+    allHostContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "cat /etc/hosts")
+
+    if echo "$allHostContent" | grep -q "$hostContent"; then
+        echo "host内容已填充，不再需要额外添加"
+    else
+        echo "host内容缺失，将进行添加，要添加的内容为 $hostContent"
+        kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "echo '$hostContent' >> /etc/hosts "
+    fi
 }
 
 function computeTopicDiskSize() {
@@ -74,6 +85,8 @@ function computeTopicDiskSize() {
     enableSASL=$3
     topic=$4
 
+    echo "for test ::: computeTopicDiskSize, computeTopicDiskSize, computeTopicDiskSize"
+    start_time=$(date +%s)
     allTopicSizeContent=""
     if [ "$enableSASL" = "true" ]; then
         allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-log-dirs.sh --bootstrap-server localhost:9093 --command-config $admin_config --describe --topic-list $topic")
@@ -81,6 +94,12 @@ function computeTopicDiskSize() {
         allTopicSizeContent=$(kubectl -n "${ns}" exec "$kafkaInstanceName-0-0" -c kafka -- /bin/sh -c "unset JMX_PORT; unset KAFKA_OPTS; unset KAFKA_JMX_OPTS; /opt/bitnami/kafka/bin/kafka-log-dirs.sh --bootstrap-server localhost:9093 --describe --topic-list $topic")
     fi
     third_line=$(echo "$allTopicSizeContent" | sed -n '3p')
+
+    end_time=$(date +%s)
+
+    # 计算耗时
+    elapsed_time=$((end_time - start_time))
+    echo "computeTopicDiskSize elapsed_time is $elapsed_time"
 
     # 不使用 jq，使用 awk 来提取并求和分区大小
     totalSizeByte=$(echo $third_line | grep -o '"size":[0-9]*'  | awk -F: '{sum += $2} END {print sum}')

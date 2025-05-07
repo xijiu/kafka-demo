@@ -1,6 +1,5 @@
 package kafka;
 
-import com.cestc.cmq.kafka.XW_DDS.DDSConfigs;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -83,23 +82,7 @@ public class UtilTools {
         properties.forEach((k, v) -> System.out.println(k + ":" + v));
     }
     
-    public static KafkaConsumer<byte[], byte[]> createConsumer() {
-        Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, properties.get("bootstrap-servers"));
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        props.put(ConsumerConfig.ALLOW_AUTO_CREATE_TOPICS_CONFIG, "false");
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, DDSConfigs.groupId);
-        
-        String pullRecords = properties.get("pull-records");
-        if (pullRecords != null && !pullRecords.equals("0")) {
-            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, pullRecords);
-        }
-//        setSASL(props);
-        return new KafkaConsumer<>(props);
-    }
+
     
     public static KafkaProducer<byte[], byte[]> createProducer() {
         Properties props = new Properties();
@@ -137,10 +120,6 @@ public class UtilTools {
         props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 20000);
         setSASL(props);
         return AdminClient.create(props);
-    }
-    
-    public static String getTopic() {
-        return properties.get("topic") == null ? DDSConfigs.topic : properties.get("topic");
     }
     
     public static long getMsgNum() {

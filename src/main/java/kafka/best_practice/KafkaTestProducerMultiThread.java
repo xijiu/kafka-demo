@@ -1,6 +1,5 @@
 package kafka.best_practice;
 
-import com.cestc.cmq.kafka.UtilTools;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -34,7 +33,7 @@ public class KafkaTestProducerMultiThread {
         kafkaProducer.send(record);
 
 
-        KafkaConsumer<byte[], byte[]> kafkaConsumer = UtilTools.createConsumer();
+        KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
         ConsumerRecords<byte[], byte[]> consumerRecords = kafkaConsumer.poll(Duration.ofSeconds(1));
         Iterator<ConsumerRecord<byte[], byte[]>> iterator = consumerRecords.iterator();
         while (iterator.hasNext()) {

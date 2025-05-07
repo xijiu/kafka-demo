@@ -1,6 +1,5 @@
 package kafka;
 
-import com.cestc.cmq.kafka.XW_DDS.DDSConfigs;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.OffsetSpec;
@@ -41,66 +40,11 @@ public class SyncSendMessage {
     }
 
     private static void initConfig() {
-        TOPIC = UtilTools.getTopic();
         MSG_SIZE = UtilTools.getMsgSize() != 0 ? (int) UtilTools.getMsgSize() : MSG_SIZE;
         MSG_TOTAL_NUM = UtilTools.getMsgNum() != 0 ? (int) UtilTools.getMsgNum() : MSG_TOTAL_NUM;
         BATCH_NUM = UtilTools.getBatchNum() != 0 ? UtilTools.getBatchNum() : BATCH_NUM;
         THREAD_NUM = UtilTools.getThreadNum() != 0 ? UtilTools.getThreadNum() : THREAD_NUM;
         SINGLE_MSG = UtilTools.makeMsg(MSG_SIZE);
-    }
-
-    public static void multiSend(boolean runAsync) {
-        initConfig();
-        long tik = System.currentTimeMillis();
-        doMultiSend(runAsync);
-        if (runAsync) {
-            waitingConsumerFinish();
-        }
-        totalCostTime = System.currentTimeMillis() - tik;
-        printFinalResult(runAsync);
-    }
-
-    private static void waitingConsumerFinish() {
-        AdminClient adminClient = UtilTools.createAdminClient();
-        while (true) {
-            try {
-
-                Map<TopicPartition, OffsetSpec> topicPartitionOffsets = new HashMap<>();
-                TopicDescription topicDescription = adminClient.describeTopics(Collections.singletonList(DDSConfigs.topic)).all().get().get(DDSConfigs.topic);
-                topicDescription.partitions();
-                for (TopicPartitionInfo partition : topicDescription.partitions()) {
-                    topicPartitionOffsets.put(new TopicPartition(DDSConfigs.topic, partition.partition()), OffsetSpec.latest());
-                }
-
-                Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> topicListOffsetsResult = adminClient.listOffsets(topicPartitionOffsets).all().get();
-                Map<Integer, Long> map = new HashMap<>();
-                for (Map.Entry<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> entry : topicListOffsetsResult.entrySet()) {
-                    int partition = entry.getKey().partition();
-                    long offset = entry.getValue().offset();
-                    map.put(partition, offset);
-                }
-
-
-                Map<TopicPartition, OffsetAndMetadata> topicPartitionOffsetAndMetadataMap = adminClient.listConsumerGroupOffsets(DDSConfigs.groupId).partitionsToOffsetAndMetadata().get();
-                boolean allMsgConsumed = true;
-                for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : topicPartitionOffsetAndMetadataMap.entrySet()) {
-                    TopicPartition topicPartition = entry.getKey();
-                    OffsetAndMetadata offsetAndMetadata = entry.getValue();
-                    if (offsetAndMetadata.offset() < map.get(topicPartition.partition())) {
-                        allMsgConsumed = false;
-                        break;
-                    }
-                }
-                if (allMsgConsumed) {
-                    break;
-                } else {
-                    System.out.println("Not all the messages have been consumed, continue to wait......");
-                    Thread.sleep(1000);
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
     }
 
     private static void printFinalResult(boolean runAsync) {
@@ -241,7 +185,7 @@ public class SyncSendMessage {
 
         while (true) {
             try {
-                Map<TopicPartition, OffsetAndMetadata> topicPartitionOffsetAndMetadataMap = kafkaAdmin.listConsumerGroupOffsets(DDSConfigs.groupId).partitionsToOffsetAndMetadata().get();
+                Map<TopicPartition, OffsetAndMetadata> topicPartitionOffsetAndMetadataMap = kafkaAdmin.listConsumerGroupOffsets("").partitionsToOffsetAndMetadata().get();
                 boolean allMsgConsumed = true;
                 for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : topicPartitionOffsetAndMetadataMap.entrySet()) {
                     TopicPartition topicPartition = entry.getKey();
