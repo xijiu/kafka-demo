@@ -8,7 +8,7 @@ import org.apache.kafka.common.config.SaslConfigs;
 import java.util.Properties;
 
 public abstract class AdminTest {
-    private static final String BOOTSTRAP_SERVERS = "10.253.246.47:9095,10.253.246.46:9095,10.253.246.48:9095";
+    private static final String BOOTSTRAP_SERVERS = "10.253.246.21:9095,10.253.246.14:9095,10.253.246.13:9095";
     private static final boolean USE_SASL = false;
     private static final String USER_NAME = "kafka-egwiwwcls9";
     private static final String PASSWORD = "__CIPHER__V0uCjSXxAa1QMVNDn1fjyT46tfIq/OGDDlQ=";

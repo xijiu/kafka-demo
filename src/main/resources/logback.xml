@@ -10,15 +10,15 @@
     <!-- property可以用来设置变量 name，用于${name}访问的key value，用于${name}访问的value
     <property name="log.path" value="F:\\logback.log" />-->
 
-    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <Pattern>.%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg %n
-            </Pattern>
-        </encoder>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
-        </filter>
-    </appender>
+<!--    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">-->
+<!--        <encoder>-->
+<!--            <Pattern>.%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg %n-->
+<!--            </Pattern>-->
+<!--        </encoder>-->
+<!--        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">-->
+<!--            <level>INFO</level>-->
+<!--        </filter>-->
+<!--    </appender>-->
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -74,7 +74,6 @@
     <root>
         <!-- Log Level — ERROR, WARN, INFO, DEBUG or TRACE. -->
         <level value="INFO"/>
-        <appender-ref ref="console"/>
         <appender-ref ref="info-file"/>
         <appender-ref ref="error-file"/>
         <appender-ref ref="STDOUT" />

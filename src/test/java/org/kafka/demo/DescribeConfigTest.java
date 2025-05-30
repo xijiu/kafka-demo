@@ -17,7 +17,7 @@ public class DescribeConfigTest extends AdminTest {
     @Test
     public void describeConfigTest() throws Exception {
         try (AdminClient adminClient = createAdminClient()) {
-            DescribeConfigsResult result = adminClient.describeConfigs(Collections.singletonList(new ConfigResource(ConfigResource.Type.TOPIC, "topicA")));
+            DescribeConfigsResult result = adminClient.describeConfigs(Collections.singletonList(new ConfigResource(ConfigResource.Type.TOPIC, "topicB")));
             Map<ConfigResource, Config> configMap = result.all().get();
             for (Map.Entry<ConfigResource, Config> entry : configMap.entrySet()) {
                 System.out.println("ConfigResource is: " + entry.getKey());
