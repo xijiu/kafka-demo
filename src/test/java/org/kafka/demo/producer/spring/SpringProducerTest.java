@@ -31,6 +31,7 @@ public class SpringProducerTest {
 
         for (int i = 0; i < Integer.MAX_VALUE; i++) {
             long begin = System.currentTimeMillis();
+            log.info("prepare send one msg");
             ListenableFuture<SendResult<String, String>> future = kafkaTemplate.send("topicA", "content");
             future.addCallback(new ListenableFutureCallback<>() {
 
@@ -48,7 +49,7 @@ public class SpringProducerTest {
                 }
             });
 
-            Thread.sleep(10000);
+            Thread.sleep(5000);
         }
 
         System.out.println("begin wait");

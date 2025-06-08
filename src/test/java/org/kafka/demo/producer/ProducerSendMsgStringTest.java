@@ -1,5 +1,6 @@
 package org.kafka.demo.producer;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -12,11 +13,11 @@ import org.kafka.demo.tool.CommonTools;
 
 import java.util.Properties;
 
-
+@Slf4j
 public class ProducerSendMsgStringTest {
 
     private static final String TOPIC_NAME = "topic1";
-    private static final String BOOTSTRAP_SERVERS = "10.253.246.27:9095,10.253.246.30:9095,10.253.246.26:9095";
+    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
     private static final boolean USE_SASL = false;
     private static final String USER_NAME = "kafka-egwiwwcls9";
     private static final String PASSWORD = "__CIPHER__V0uCjSXxAa1QMVNDn1fjyT46tfIq/OGDDlQ=";
@@ -30,15 +31,15 @@ public class ProducerSendMsgStringTest {
     private static void send(KafkaProducer<String, String> kafkaProducer) throws Exception {
         String msgContent = "abc";
         for (int i = 0; i < Integer.MAX_VALUE; i++) {
-
-            ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, 0, 1432885911000L, null, msgContent.toString());
+            ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, null, msgContent.toString());
+            long begin = System.currentTimeMillis();
             kafkaProducer.send(record, (metadata, exception) -> {
                 if (exception != null) {
-                    exception.printStackTrace();
-                    System.out.println("send error !!!");
+                    log.error("send error !!!", exception);
                 } else {
-                    System.out.printf("send success!!! topic %s, partition %s, offset %s, timestamp %s %n",
-                            metadata.topic(), metadata.partition(), metadata.offset(), metadata.timestamp());
+                    long cost = System.currentTimeMillis() - begin;
+                    log.info("send msg succeed, topic {}, partition {}, offset {}, msg born timestamp {}, callback elapsed time {} ms",
+                            metadata.topic(), metadata.partition(), metadata.offset(), metadata.timestamp(), cost);
                 }
             });
             CommonTools.sleepMilliseconds(1000);

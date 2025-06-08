@@ -61,7 +61,6 @@ public class KafkaClientMetricStat {
         } catch (Exception e) {
             log.error("{}collect error", logPrefix, e);
         }
-
     }
 
     private static class ProducerMetricsStat {
@@ -78,7 +77,7 @@ public class KafkaClientMetricStat {
             Set<ObjectName> mbeanNames = mbs.queryNames(namePattern, null);
             for (ObjectName mbeanName : mbeanNames) {
                 AttributeList attributeList = mbs.getAttributes(mbeanName, collectAttrs);
-                log.info("{} mbeanName {}, attributes {}", logPrefix, mbeanName, transString(attributeList));
+                log.info("{}mbeanName {}, attributes {}", logPrefix, mbeanName, transString(attributeList));
             }
         }
     }
@@ -97,7 +96,7 @@ public class KafkaClientMetricStat {
             Set<ObjectName> mbeanNames = mbs.queryNames(namePattern, null);
             for (ObjectName mbeanName : mbeanNames) {
                 AttributeList attributeList = mbs.getAttributes(mbeanName, collectAttrs);
-                log.info("{} mbeanName {}, attributes {}", logPrefix, mbeanName, transString(attributeList));
+                log.info("{}mbeanName {}, attributes {}", logPrefix, mbeanName, transString(attributeList));
             }
         }
     }
