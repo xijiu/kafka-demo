@@ -1,19 +1,14 @@
-package org.kafka.demo;
+package org.kafka.demo.admin;
 
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.Config;
-import org.apache.kafka.clients.admin.ConfigEntry;
-import org.apache.kafka.clients.admin.DescribeConfigsResult;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionInfo;
-import org.apache.kafka.common.config.ConfigResource;
 import org.junit.Test;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -24,12 +19,16 @@ public class DescribeTopicTest extends AdminTest {
 
     @Test
     public void describeTopicTest() throws Exception {
+        String topicName = "topic2";
         try (AdminClient adminClient = createAdminClient()) {
-            DescribeTopicsResult describeTopicsResult = adminClient.describeTopics(Collections.singletonList("topicB"));
+            DescribeTopicsResult describeTopicsResult = adminClient.describeTopics(Collections.singletonList(topicName));
 
             Map<String, TopicDescription> topicMap = describeTopicsResult.all().get();
             for (Map.Entry<String, TopicDescription> entry : topicMap.entrySet()) {
+                String topic = entry.getKey();
                 TopicDescription topicDescription = entry.getValue();
+                System.out.printf("Topic name [%s], partition [%s], replica factor [%s] %n",
+                        topic, topicDescription.partitions().size(), topicDescription.partitions().get(0).replicas().size());
                 List<TopicPartitionInfo> partitions = topicDescription.partitions();
                 for (TopicPartitionInfo partition : partitions) {
                     System.out.println(partition);

@@ -14,8 +14,8 @@ public class ProducerSimpleTest extends AbstractProducerTest {
     private static final String MSG_CONTENT = "test_content";
 
     private static final boolean USE_SASL = false;
-    private static final String USER_NAME = "kafka-egwiwwcls9";
-    private static final String PASSWORD = "__CIPHER__V0uCjSXxAa1QMVNDn1fjyT46tfIq/OGDDlQ=";
+    private static final String USER_NAME = "kafka-gfg0vmvzuw";
+    private static final String PASSWORD = "gfg0vmwgxy";
 
     @Test
     public void sendMsg() {

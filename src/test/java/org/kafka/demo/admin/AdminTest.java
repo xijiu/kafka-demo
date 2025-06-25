@@ -1,4 +1,4 @@
-package org.kafka.demo;
+package org.kafka.demo.admin;
 
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClient;

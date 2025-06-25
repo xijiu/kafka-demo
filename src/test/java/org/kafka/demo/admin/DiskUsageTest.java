@@ -1,4 +1,4 @@
-package org.kafka.demo;
+package org.kafka.demo.admin;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DescribeLogDirsResult;

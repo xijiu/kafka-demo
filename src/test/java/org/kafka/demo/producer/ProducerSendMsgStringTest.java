@@ -16,7 +16,7 @@ import java.util.Properties;
 @Slf4j
 public class ProducerSendMsgStringTest {
 
-    private static final String TOPIC_NAME = "topic1";
+    private static final String TOPIC_NAME = "topic2";
     private static final String BOOTSTRAP_SERVERS = "localhost:9092";
     private static final boolean USE_SASL = false;
     private static final String USER_NAME = "kafka-egwiwwcls9";
@@ -42,7 +42,7 @@ public class ProducerSendMsgStringTest {
                             metadata.topic(), metadata.partition(), metadata.offset(), metadata.timestamp(), cost);
                 }
             });
-            CommonTools.sleepMilliseconds(1000);
+            CommonTools.sleepMilliseconds(5000);
         }
         kafkaProducer.close();
     }
