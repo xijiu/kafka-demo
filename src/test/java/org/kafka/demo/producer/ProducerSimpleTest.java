@@ -18,6 +18,11 @@ public class ProducerSimpleTest extends AbstractProducerTest {
     private static final String PASSWORD = "gfg0vmwgxy";
 
     @Test
+    public void sendMsg2() {
+        sendMsg();
+    }
+
+    @Test
     public void sendMsg() {
         try (KafkaProducer<String, String> kafkaProducer = createProducer(BOOTSTRAP_SERVERS, USE_SASL, USER_NAME, PASSWORD)) {
             send(kafkaProducer);

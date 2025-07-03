@@ -26,9 +26,9 @@ import java.util.concurrent.ExecutionException;
 
 public class KafkaConsumerTest {
 
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
+    private static final String BOOTSTRAP_SERVERS = "10.253.246.30:9095,10.253.246.27:9095,10.253.246.26:9095";
     private static final boolean USE_SASL = false;
-    private static final String TOPIC_NAME = "topic2";
+    private static final String TOPIC_NAME = "topic3";
     private static final String GROUP_NAME = "group1";
     private static final String USER_NAME = "kafka-egwiwwcls9";
     private static final String PASSWORD = "__CIPHER__V0uCjSXxAa1QMVNDn1fjyT46tfIq/OGDDlQ=";
