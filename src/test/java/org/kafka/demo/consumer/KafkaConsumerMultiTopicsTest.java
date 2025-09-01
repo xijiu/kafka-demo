@@ -13,33 +13,28 @@ import org.kafka.demo.KafkaClientMetricStat;
 import org.kafka.demo.tool.CommonTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
-import org.springframework.util.concurrent.ListenableFuture;
-import org.springframework.util.concurrent.ListenableFutureCallback;
 
-import javax.management.MBeanServerConnection;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
+import java.util.regex.Pattern;
 
-public class KafkaConsumerTest {
+public class KafkaConsumerMultiTopicsTest {
 
-    private static final String BOOTSTRAP_SERVERS = "10.253.246.12:9095,10.253.246.11:9095,10.253.246.10:9095";
+    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
     private static final boolean USE_SASL = false;
-    private static final String TOPIC_NAME = "topic1";
-    private static final String GROUP_NAME = "group2";
+    private static final String TOPIC_NAME_PREFIX = "batch_create_topic_test_";
+    private static final String GROUP_NAME = "group1";
     private static final String USER_NAME = "kafka-egwiwwcls9";
     private static final String PASSWORD = "__CIPHER__V0uCjSXxAa1QMVNDn1fjyT46tfIq/OGDDlQ=";
 
-    private static final Logger log = LoggerFactory.getLogger(KafkaConsumerTest.class);
+    private static final Logger log = LoggerFactory.getLogger(KafkaConsumerMultiTopicsTest.class);
 
     @Test
     public void test2() {
         KafkaClientMetricStat.start();
         try (KafkaConsumer<byte[], byte[]> kafkaConsumer = createConsumer()) {
-            kafkaConsumer.subscribe(Collections.singleton(TOPIC_NAME));
+            kafkaConsumer.subscribe(Pattern.compile(TOPIC_NAME_PREFIX + ".*"));
 
             while (true) {
                 ConsumerRecords<byte[], byte[]> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(1000));
@@ -48,11 +43,9 @@ public class KafkaConsumerTest {
                         System.out.printf("receive msg, topic %s, partition %d, offset is %d, msg time %s, current time %s %n",
                                 record.topic(), record.partition(), record.offset(), CommonTools.formatTimestamp(record.timestamp()), CommonTools.now());
                     }
-                    kafkaConsumer.commitSync();
                 } else {
                     System.out.println("empty poll");
                 }
-                CommonTools.sleepMilliseconds(5000);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -70,7 +63,7 @@ public class KafkaConsumerTest {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, GROUP_NAME);
         props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "1");
         props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, "1");
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
+//        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1000");
 //        props.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.cestc.cmq.kafka.show.MyConsumerInterceptors");
         setSaslConfig(props);
         return new KafkaConsumer<>(props);

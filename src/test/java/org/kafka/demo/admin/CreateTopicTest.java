@@ -20,8 +20,8 @@ public class CreateTopicTest extends AdminTest {
     public void test() throws Exception {
         try (AdminClient adminClient = createAdminClient()) {
             String topicName = "topic3";
-            int partitionNum = 3;
-            short replicaFactor = 1;
+            int partitionNum = 1;
+            short replicaFactor = 3;
             CreateTopicsResult result = adminClient.createTopics(Collections.singletonList(new NewTopic(topicName, partitionNum, replicaFactor)));
             result.all().get();
             System.out.printf("topic %s create succeed %n", topicName);
@@ -32,8 +32,8 @@ public class CreateTopicTest extends AdminTest {
     public void batchCreateTopicsTest() throws Exception {
         try (AdminClient adminClient = createAdminClient()) {
             List<NewTopic> topics = new ArrayList<>();
-            for (int i = 10; i < 1000; i++) {
-                topics.add(new NewTopic("batch_create_topic_test_" + i, 1, (short) 1));
+            for (int i = 0; i < 10; i++) {
+                topics.add(new NewTopic("batch_create_topic_test_" + i, 12, (short) 3));
             }
             CreateTopicsResult result = adminClient.createTopics(topics);
             result.all().get();

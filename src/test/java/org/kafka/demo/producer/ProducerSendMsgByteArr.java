@@ -16,12 +16,12 @@ import java.util.Properties;
 
 public class ProducerSendMsgByteArr {
 
-    private static final String BOOTSTRAP_SERVERS = "10.253.246.47:9095,10.253.246.46:9095,10.253.246.48:9095";
+    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
     private static final boolean USE_SASL = false;
     private static final String USER_NAME = "kafka-egwiwwcls9";
     private static final String PASSWORD = "__CIPHER__V0uCjSXxAa1QMVNDn1fjyT46tfIq/OGDDlQ=";
 
-    private static byte[] SINGLE_MSG = new byte[1024 * 1024 * 20];
+    private static byte[] SINGLE_MSG = new byte[1024 * 500];
 
 
     @Test
@@ -32,7 +32,7 @@ public class ProducerSendMsgByteArr {
     private static void singleSendMsg() throws Exception {
         KafkaProducer<byte[], byte[]> kafkaProducer = createProducer();
 
-        String topicName = "topic1";
+        String topicName = "topic3";
         ProducerRecord<byte[], byte[]> record1 = new ProducerRecord<>(topicName, SINGLE_MSG);
         send(kafkaProducer, record1);
 
@@ -50,7 +50,7 @@ public class ProducerSendMsgByteArr {
                     System.out.println(" send success!!! offset is " + metadata.offset());
                 }
             });
-            Thread.sleep(10);
+            Thread.sleep(5000);
         }
     }
 
