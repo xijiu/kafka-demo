@@ -19,9 +19,9 @@ public class CreateTopicTest extends AdminTest {
     @Test
     public void test() throws Exception {
         try (AdminClient adminClient = createAdminClient()) {
-            String topicName = "topic3";
+            String topicName = "isr_test_1";
             int partitionNum = 1;
-            short replicaFactor = 3;
+            short replicaFactor = 2;
             CreateTopicsResult result = adminClient.createTopics(Collections.singletonList(new NewTopic(topicName, partitionNum, replicaFactor)));
             result.all().get();
             System.out.printf("topic %s create succeed %n", topicName);

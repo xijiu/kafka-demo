@@ -3,23 +3,30 @@ package org.kafka.demo.producer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.Test;
 import org.kafka.demo.tool.CommonTools;
 
 @Slf4j
 public class ProducerSendToMultiTopicsTest extends AbstractProducerTest {
 
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
     private static final String TOPIC_PREFIX = "batch_create_topic_test_";
     private static final String MSG_CONTENT = "test_content";
 
-    private static final boolean USE_SASL = false;
-    private static final String USER_NAME = "kafka-gfg0vmvzuw";
-    private static final String PASSWORD = "gfg0vmwgxy";
+    @Override
+    protected ProducerParams producerParamsBuilder() {
+        return ProducerParams.builder()
+                .bootstrapServers("localhost:9092")
+                .serializerClass(StringSerializer.class)
+                .useSasl(false)
+                .username("")
+                .password("")
+                .build();
+    }
 
     @Test
     public void sendMsg() {
-        try (KafkaProducer<String, String> kafkaProducer = createProducer(BOOTSTRAP_SERVERS, USE_SASL, USER_NAME, PASSWORD)) {
+        try (KafkaProducer<String, String> kafkaProducer = createProducer()) {
             send(kafkaProducer);
         }
     }

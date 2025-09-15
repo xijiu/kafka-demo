@@ -1,26 +1,30 @@
-package org.kafka.demo.producer;
+package org.kafka.demo.producer.interceptor;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.Test;
-import org.kafka.demo.tool.CommonTools;
+import org.kafka.demo.producer.AbstractProducerTest;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
-public class ProducerSimpleTest extends AbstractProducerTest {
+public class ProducerInterceptorTest extends AbstractProducerTest {
 
-    private static final String TOPIC_NAME = "topic3";
+    private static final String TOPIC_NAME = "topic_simple";
     private static final String MSG_CONTENT = "test_content";
 
     @Override
     protected ProducerParams producerParamsBuilder() {
+        List<String> interceptors = new ArrayList<>();
+        interceptors.add("org.kafka.demo.producer.interceptor.InterceptorTest1");
+        interceptors.add("org.kafka.demo.producer.interceptor.InterceptorTest2");
         return ProducerParams.builder()
-                .bootstrapServers("localhost:9092")
-                .serializerClass(StringSerializer.class)
-                .useSasl(false)
-                .username("")
-                .password("")
+                .bootstrapServers("10.255.225.107:9095,10.255.225.108:9095,10.255.225.106:9095")
+                .specialProperties(Map.of(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, interceptors))
                 .build();
     }
 
@@ -32,7 +36,7 @@ public class ProducerSimpleTest extends AbstractProducerTest {
     }
 
     private static void send(KafkaProducer<String, String> kafkaProducer) {
-        for (int i = 0; i < Integer.MAX_VALUE; i++) {
+        for (int i = 0; i < 3; i++) {
             ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, null, MSG_CONTENT);
             long begin = System.currentTimeMillis();
             kafkaProducer.send(record, (metadata, exception) -> {
@@ -44,7 +48,6 @@ public class ProducerSimpleTest extends AbstractProducerTest {
                             metadata.topic(), metadata.partition(), metadata.offset(), metadata.timestamp(), cost);
                 }
             });
-            CommonTools.sleepMilliseconds(5000);
         }
     }
 }

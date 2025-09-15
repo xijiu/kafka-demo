@@ -1,10 +1,15 @@
 package org.kafka.demo.tool;
 
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.utils.Utils;
+
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class CommonTools {
 
@@ -38,5 +43,12 @@ public class CommonTools {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
         // 将 LocalDateTime 对象格式化为字符串
         return currentDateTime.format(formatter);
+    }
+
+    public static void printPartitionInfo(TopicPartitionInfo partition) {
+        System.out.println("partition: " + partition.partition()
+                        + ", leader: " + partition.leader().id()
+                        + ", replicas: [" + Utils.join(partition.replicas().stream().map(Node::id).collect(Collectors.toList()), ", ") + "]"
+                        + ", isr: [" + Utils.join(partition.isr().stream().map(Node::id).collect(Collectors.toList()), ", ") + "]");
     }
 }

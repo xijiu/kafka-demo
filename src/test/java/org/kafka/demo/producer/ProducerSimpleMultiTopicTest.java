@@ -3,6 +3,7 @@ package org.kafka.demo.producer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.Test;
 import org.kafka.demo.tool.CommonTools;
 
@@ -13,19 +14,25 @@ import java.util.stream.Stream;
 @Slf4j
 public class ProducerSimpleMultiTopicTest extends AbstractProducerTest {
 
-    private static final String BOOTSTRAP_SERVERS = "10.253.246.12:9095,10.253.246.11:9095,10.253.246.10:9095";
     private static final Set<String> TOPIC_NAMES = Stream.of(
             "topic1", "topic2", "topic3"
     ).collect(Collectors.toSet());
     private static final String MSG_CONTENT = "test_content";
 
-    private static final boolean USE_SASL = false;
-    private static final String USER_NAME = "kafka-gfg0vmvzuw";
-    private static final String PASSWORD = "gfg0vmwgxy";
+    @Override
+    protected ProducerParams producerParamsBuilder() {
+        return ProducerParams.builder()
+                .bootstrapServers("10.253.246.12:9095,10.253.246.11:9095,10.253.246.10:9095")
+                .serializerClass(StringSerializer.class)
+                .useSasl(false)
+                .username("")
+                .password("")
+                .build();
+    }
 
     @Test
     public void sendMsg() {
-        try (KafkaProducer<String, String> kafkaProducer = createProducer(BOOTSTRAP_SERVERS, USE_SASL, USER_NAME, PASSWORD)) {
+        try (KafkaProducer<String, String> kafkaProducer = createProducer()) {
             send(kafkaProducer);
         }
     }

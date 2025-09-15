@@ -8,6 +8,7 @@ import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionInfo;
 import org.junit.Test;
+import org.kafka.demo.tool.CommonTools;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -19,7 +20,7 @@ public class DescribeTopicTest extends AdminTest {
 
     @Test
     public void describeTopicTest() throws Exception {
-        String topicName = "topic2";
+        String topicName = "topic3";
         try (AdminClient adminClient = createAdminClient()) {
             DescribeTopicsResult describeTopicsResult = adminClient.describeTopics(Collections.singletonList(topicName));
 
@@ -31,7 +32,7 @@ public class DescribeTopicTest extends AdminTest {
                         topic, topicDescription.partitions().size(), topicDescription.partitions().get(0).replicas().size());
                 List<TopicPartitionInfo> partitions = topicDescription.partitions();
                 for (TopicPartitionInfo partition : partitions) {
-                    System.out.println(partition);
+                    CommonTools.printPartitionInfo(partition);
                 }
             }
         }

@@ -13,31 +13,38 @@ import org.kafka.demo.KafkaClientMetricStat;
 import org.kafka.demo.tool.CommonTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
-import org.springframework.util.concurrent.ListenableFuture;
-import org.springframework.util.concurrent.ListenableFutureCallback;
 
-import javax.management.MBeanServerConnection;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
 
-public class KafkaConsumerTest {
+public class MultiKafkaConsumerTest {
 
-    private static final String BOOTSTRAP_SERVERS = "10.255.225.74:9095,10.255.225.75:9095,10.255.225.76:9095";
+    private static final String BOOTSTRAP_SERVERS = "10.255.225.107:9095,10.255.225.108:9095,10.255.225.106:9095";
     private static final boolean USE_SASL = false;
     private static final String TOPIC_NAME = "big_topic";
     private static final String GROUP_NAME = "group2";
     private static final String USER_NAME = "kafka-egwiwwcls9";
     private static final String PASSWORD = "__CIPHER__V0uCjSXxAa1QMVNDn1fjyT46tfIq/OGDDlQ=";
 
-    private static final Logger log = LoggerFactory.getLogger(KafkaConsumerTest.class);
+    private static final Logger log = LoggerFactory.getLogger(MultiKafkaConsumerTest.class);
 
     @Test
-    public void test2() {
-        KafkaClientMetricStat.start();
+    public void multiConsumer() throws Exception {
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < 500; i++) {
+            Thread thread = new Thread(this::singleConsume);
+            thread.start();
+            threads.add(thread);
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+    }
+
+    private void singleConsume() {
         try (KafkaConsumer<byte[], byte[]> kafkaConsumer = createConsumer()) {
             kafkaConsumer.subscribe(Collections.singleton(TOPIC_NAME));
 
@@ -52,7 +59,7 @@ public class KafkaConsumerTest {
                 } else {
                     System.out.println("empty poll");
                 }
-                CommonTools.sleepMilliseconds(5000);
+                CommonTools.sleepMilliseconds(1000);
             }
         } catch (Exception e) {
             e.printStackTrace();
