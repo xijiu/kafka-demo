@@ -7,7 +7,7 @@
     <!-- contextName ，设置日志上下文名称，可以通过%contextName来打印日志上下文名称 -->
     <contextName>mq</contextName>
 
-<!--    <logger name="org.apache.kafka" level="DEBUG" />-->
+    <logger name="org.apache.kafka" level="DEBUG" />
 
     <!-- property可以用来设置变量 name，用于${name}访问的key value，用于${name}访问的value
     <property name="log.path" value="F:\\logback.log" />-->

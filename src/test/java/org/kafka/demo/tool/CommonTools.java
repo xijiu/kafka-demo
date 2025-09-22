@@ -45,6 +45,14 @@ public class CommonTools {
         return currentDateTime.format(formatter);
     }
 
+    /**
+     * 带时间戳输出内容
+     * @param content   要输出的内容
+     */
+    public static void printlnWithTimestamp(String content) {
+        System.out.println(now() + " " + content);
+    }
+
     public static void printPartitionInfo(TopicPartitionInfo partition) {
         System.out.println("partition: " + partition.partition()
                         + ", leader: " + partition.leader().id()

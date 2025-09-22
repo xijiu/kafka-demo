@@ -2,25 +2,25 @@ package org.kafka.demo.producer;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.Test;
 import org.kafka.demo.tool.CommonTools;
 
+import java.util.Map;
+
 @Slf4j
 public class ProducerSimpleTest extends AbstractProducerTest {
 
-    private static final String TOPIC_NAME = "topic3";
+    private static final String TOPIC_NAME = "topic12";
     private static final String MSG_CONTENT = "test_content";
 
     @Override
     protected ProducerParams producerParamsBuilder() {
         return ProducerParams.builder()
-                .bootstrapServers("localhost:9092")
-                .serializerClass(StringSerializer.class)
-                .useSasl(false)
-                .username("")
-                .password("")
+                .bootstrapServers("10.255.225.107:9095,10.255.225.108:9095,10.255.225.106:9095")
+                .specialProperties(Map.of(ProducerConfig.BATCH_SIZE_CONFIG, "1"))
                 .build();
     }
 
@@ -44,7 +44,7 @@ public class ProducerSimpleTest extends AbstractProducerTest {
                             metadata.topic(), metadata.partition(), metadata.offset(), metadata.timestamp(), cost);
                 }
             });
-            CommonTools.sleepMilliseconds(5000);
+            CommonTools.sleepMilliseconds(200);
         }
     }
 }
