@@ -1,23 +1,27 @@
 package org.kafka.demo.consumer;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.junit.Test;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Map;
 
 @Slf4j
-public class KafkaConsumerTest extends AbstractConsumerTest {
+public class AutoCommitOffsetTest extends AbstractConsumerTest {
 
     private static final String TOPIC_NAME = "topic_simple";
 
     @Override
-    protected AbstractConsumerTest.ConsumerParams consumerParamsBuilder() {
-        return AbstractConsumerTest.ConsumerParams.builder()
-                .bootstrapServers("10.255.225.107:9095,10.255.225.108:9095,10.255.225.106:9095")
+    protected ConsumerParams consumerParamsBuilder() {
+        return ConsumerParams.builder()
+                .bootstrapServers("10.255.225.74:9095,10.255.225.75:9095,10.255.225.76:9095")
                 .group("group3")
+                .specialProperties(Map.of(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true"))
                 .build();
     }
 
@@ -29,11 +33,10 @@ public class KafkaConsumerTest extends AbstractConsumerTest {
             while (true) {
                 ConsumerRecords<String, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(5000));
                 printConsumerRecords(consumerRecords);
-                if (consumerRecords.count() > 0) {
-                    kafkaConsumer.commitSync();
-                }
+                System.out.println("prepare commit begin");
+                kafkaConsumer.commitSync();
+                System.out.println("prepare commit end");
             }
         }
     }
-
 }

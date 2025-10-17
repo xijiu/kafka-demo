@@ -13,8 +13,8 @@ import java.util.Map;
 @Slf4j
 public class ProducerSimpleTest extends AbstractProducerTest {
 
-    private static final String TOPIC_NAME = "topic12";
-    private static final String MSG_CONTENT = "test_content";
+    private static final String TOPIC_NAME = "topic_simple";
+    private static final String MSG_CONTENT = "";
 
     @Override
     protected ProducerParams producerParamsBuilder() {
@@ -44,7 +44,7 @@ public class ProducerSimpleTest extends AbstractProducerTest {
                             metadata.topic(), metadata.partition(), metadata.offset(), metadata.timestamp(), cost);
                 }
             });
-            CommonTools.sleepMilliseconds(200);
+            CommonTools.sleepMilliseconds(2000);
         }
     }
 }

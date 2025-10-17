@@ -18,7 +18,7 @@ public class ListOffsetsTest extends AdminTest {
 
     @Test
     public void listOffsetsForLEO() throws Exception {
-        String topic = "topic1";
+        String topic = "__consumer_offsets";
         try (AdminClient adminClient = createAdminClient()) {
             Map<String, TopicDescription> map = adminClient.describeTopics(Collections.singletonList(topic)).all().get();
             TopicDescription topicDescription = map.get(topic);

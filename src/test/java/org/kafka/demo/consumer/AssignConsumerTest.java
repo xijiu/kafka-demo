@@ -1,30 +1,34 @@
 package org.kafka.demo.consumer;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.junit.Test;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Map;
 
 @Slf4j
-public class KafkaConsumerTest extends AbstractConsumerTest {
+public class AssignConsumerTest extends AbstractConsumerTest {
 
     private static final String TOPIC_NAME = "topic_simple";
 
     @Override
-    protected AbstractConsumerTest.ConsumerParams consumerParamsBuilder() {
-        return AbstractConsumerTest.ConsumerParams.builder()
+    protected ConsumerParams consumerParamsBuilder() {
+        return ConsumerParams.builder()
                 .bootstrapServers("10.255.225.107:9095,10.255.225.108:9095,10.255.225.106:9095")
-                .group("group3")
+                .group("group2")
+                .specialProperties(Map.of(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true"))
                 .build();
     }
 
     @Test
     public void test2() {
         try (KafkaConsumer<String, String> kafkaConsumer = createConsumer()) {
-            kafkaConsumer.subscribe(Collections.singleton(TOPIC_NAME));
+            kafkaConsumer.assign(Collections.singleton(new TopicPartition(TOPIC_NAME, 0)));
 
             while (true) {
                 ConsumerRecords<String, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(5000));

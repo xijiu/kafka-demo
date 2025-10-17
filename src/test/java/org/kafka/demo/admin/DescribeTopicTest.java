@@ -20,7 +20,7 @@ public class DescribeTopicTest extends AdminTest {
 
     @Test
     public void describeTopicTest() throws Exception {
-        String topicName = "topic3";
+        String topicName = "__consumer_offsets";
         try (AdminClient adminClient = createAdminClient()) {
             DescribeTopicsResult describeTopicsResult = adminClient.describeTopics(Collections.singletonList(topicName));
 

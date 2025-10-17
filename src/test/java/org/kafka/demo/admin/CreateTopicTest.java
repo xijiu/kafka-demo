@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class CreateTopicTest extends AdminTest {
 
@@ -19,9 +20,9 @@ public class CreateTopicTest extends AdminTest {
     @Test
     public void test() throws Exception {
         try (AdminClient adminClient = createAdminClient()) {
-            String topicName = "isr_test_1";
-            int partitionNum = 1;
-            short replicaFactor = 2;
+            String topicName = "topic12";
+            int partitionNum = 12;
+            short replicaFactor = 1;
             CreateTopicsResult result = adminClient.createTopics(Collections.singletonList(new NewTopic(topicName, partitionNum, replicaFactor)));
             result.all().get();
             System.out.printf("topic %s create succeed %n", topicName);
@@ -38,6 +39,20 @@ public class CreateTopicTest extends AdminTest {
             CreateTopicsResult result = adminClient.createTopics(topics);
             result.all().get();
             System.out.println("batch create topics success");
+        }
+    }
+
+    @Test
+    public void createCompactTopic() throws Exception {
+        try (AdminClient adminClient = createAdminClient()) {
+            String topicName = "compact_topic_test";
+            int partitionNum = 1;
+            short replicaFactor = 2;
+            NewTopic newTopic = new NewTopic(topicName, partitionNum, replicaFactor);
+            newTopic.configs(Map.of());
+            CreateTopicsResult result = adminClient.createTopics(Collections.singletonList(newTopic));
+            result.all().get();
+            System.out.printf("topic %s create succeed %n", topicName);
         }
     }
 }
