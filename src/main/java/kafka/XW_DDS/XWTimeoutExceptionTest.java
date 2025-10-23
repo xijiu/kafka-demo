@@ -1,4 +1,4 @@
-package kafka.XW_DDS;//package com.cestc.cmq.kafka.XW_DDS;
+package kafka.XW_DDS;//package com.xxxxx.cmq.kafka.XW_DDS;
 //
 //import lombok.extern.slf4j.Slf4j;
 //import org.apache.kafka.clients.admin.AdminClientConfig;

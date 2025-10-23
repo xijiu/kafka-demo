@@ -72,7 +72,7 @@ public class ProducerFor_metadata_max_idle_ms {
         props.put(ProducerConfig.ACKS_CONFIG, "1");
         props.put(ProducerConfig.METADATA_MAX_IDLE_CONFIG, metadataExpireTime);
         props.put(ProducerConfig.METADATA_MAX_AGE_CONFIG, 2000);
-//        props.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.cestc.cmq.kafka.show.MyProducerInterceptors");
+//        props.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.xxxxx.cmq.kafka.show.MyProducerInterceptors");
 //        setSaslConfig(props);
         return new KafkaProducer<>(props);
     }

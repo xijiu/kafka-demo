@@ -39,7 +39,7 @@ public class KafkaTestConsumer {
         props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "1");
         props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, "1");
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1000");
-//        props.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.cestc.cmq.kafka.show.MyConsumerInterceptors");
+//        props.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.xxxxx.cmq.kafka.show.MyConsumerInterceptors");
         setSaslConfig(props);
         return new KafkaConsumer<>(props);
     }

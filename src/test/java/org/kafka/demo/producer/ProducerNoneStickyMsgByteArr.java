@@ -70,7 +70,7 @@ public class ProducerNoneStickyMsgByteArr {
         props.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);
         props.put(ProducerConfig.ACKS_CONFIG, "1");
         props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, "org.apache.kafka.clients.producer.RoundRobinPartitioner");
-//        props.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.cestc.cmq.kafka.show.MyProducerInterceptors");
+//        props.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.xxxxx.cmq.kafka.show.MyProducerInterceptors");
 //        setSaslConfig(props);
         return new KafkaProducer<>(props);
     }

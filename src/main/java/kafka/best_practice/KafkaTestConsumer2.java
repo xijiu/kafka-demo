@@ -41,7 +41,7 @@ public class KafkaTestConsumer2 {
         properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, "1000000");
         // 执行poll()命令的时候，一次最多poll的消息条数
         properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1000");
-        properties.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.cestc.cmq.kafka.show.MyConsumerInterceptors");
+        properties.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, "com.xxxxx.cmq.kafka.show.MyConsumerInterceptors");
 
 //        // 注意：如果实例开启了SASL，那么还需要设置以下3个配置
 //        // 配置SASL的认证机制，当前集群256、512均支持
